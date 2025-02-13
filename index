@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapa z lokalizacją ESP32</title>
+
+    <!-- Załaduj Leaflet.js -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+    <!-- Załaduj Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.4.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.4.1/firebase-database.js"></script>
+
+    <style>
+        /* Ustalamy wysokość mapy */
+        #map {
+            height: 500px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Mapa z lokalizacją ESP32</h1>
+
+    <div id="map"></div>
+
+    <script>
+        // Konfiguracja Firebase
+        const firebaseConfig = {
+            apiKey: "your-api-key",
+            authDomain: "your-project-id.firebaseapp.com",
+            databaseURL: "https://your-project-id.firebaseio.com",
+            projectId: "your-project-id",
+            storageBucket: "your-project-id.appspot.com",
+            messagingSenderId: "your-sender-id",
+            appId: "your-app-id"
+        };
+
+        // Inicjalizacja Firebase
+        const app = firebase.initializeApp(firebaseConfig);
+        const database = firebase.database(app);
+
+        // Inicjalizacja mapy Leaflet.js z OpenStreetMap
+        const map = L.map('map').setView([51.5074, -0.1278], 5);  // Ustawienie widoku mapy (Londyn)
+
+        // Dodanie warstwy mapy OpenStreetMap
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        // Zdefiniowanie czterech punktów na mapie
+        const points = [
+            {lat: 51.5074, lng: -0.1278},  // Londyn
+            {lat: 40.7128, lng: -74.0060}, // Nowy Jork
+            {lat: 48.8566, lng: 2.3522},   // Paryż
+            {lat: 34.0522, lng: -118.2437} // Los Angeles
+        ];
+
+        // Tworzenie markerów dla punktów
+        points.forEach(point => {
+            L.marker([point.lat, point.lng]).addTo(map)
+                .bindPopup(`Point: ${point.lat}, ${point.lng}`);
+        });
+
+        // Zmienna do przechowywania markera ESP32
+        let esp32Marker;
+
+        // Słuchaj zmian w lokalizacji ESP32 w Firebase
+        const latitudeRef = database.ref('gps/latitude');
+        const longitudeRef = database.ref('gps/longitude');
+
+        latitudeRef.on('value', snapshot => {
+            const latitude = snapshot.val();
+            updateEsp32Location(latitude);
+        });
+
+        longitudeRef.on('value', snapshot => {
+            const longitude = snapshot.val();
+            updateEsp32Location(null, longitude);
+        });
+
+        // Funkcja aktualizująca lokalizację ESP32 na mapie
+        function updateEsp32Location(latitude, longitude) {
+            if (latitude !== null && longitude !== null) {
+                const esp32Location = [latitude, longitude];
+
+                // Jeśli marker ESP32 już istnieje, to go zaktualizuj
+                if (esp32Marker) {
+                    esp32Marker.setLatLng(esp32Location);
+                } else {
+                    // Inaczej utwórz nowy marker dla ESP32
+                    esp32Marker = L.marker(esp32Location, {
+                        icon: L.icon({
+                            iconUrl: 'https://upload.wikimedia.org/wikipedia/commons/0/0f/Blue_dot.png',
+                            iconSize: [32, 32],
+                            iconAnchor: [16, 32],
+                            popupAnchor: [0, -32]
+                        })
+                    }).addTo(map).bindPopup("Lokalizacja ESP32");
+                }
+
+                // Zaktualizuj środek mapy
+                map.setView(esp32Location, 15);
+            }
+        }
+    </script>
+
+</body>
+</html>
